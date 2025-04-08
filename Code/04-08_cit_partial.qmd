@@ -100,13 +100,13 @@ Cons:
 #install.packages("partykit")
 #install.packages("finetune")
 #install.packages("bonsai")
-
 library(tidymodels)
 library(tidyverse)
 library(vip)
 library(partykit)
 library(finetune)
 library(bonsai)
+library(rsample)
 ```
 
 ```{r weather}
@@ -163,6 +163,8 @@ ggplot() +
                aes(x = strength_gtex),
                color = "blue") 
   
+
+
 ```
 
 Now, we put our **test set** aside and continue with our **train set** for training.  
@@ -195,11 +197,13 @@ We can search for that in this link: https://www.tmwr.org/pre-proc-table
 weather_recipe <-
   # Defining predicted and predictor variables
   recipe(strength_gtex ~ .,
-         data = weather_train) %>%
+         data = weather_train)%>%
   # Removing year and site  
     step_rm(year, site, matches("Jan|Feb|Mar|Apr|Nov|Dec")) #%>%
   # Normalizing all numeric variables except predicted variable
   #step_normalize(all_numeric(), -all_outcomes())
+
+
 
 weather_recipe
 ```
@@ -239,7 +243,7 @@ cit_spec  <-
   # Specifying cit as our model type, asking to tune the hyperparameters
 decision_tree(tree_depth = tune()) %>%
     # Specify the engine
-set_en("partykit",
+set_engine("partykit",
        conditional_min_criterion = tune()
        ) %>%
     # Specifying mode  
@@ -312,10 +316,9 @@ cit_grid_result <- tune_sim_anneal(
   preprocessor = weather_recipe,
   resamples = resampling_foldcv,
   param_info = cit_param,
-  iter = 50
-  
-)
+  iter = 50)
 cit_grid_result$.metrics[[2]]
+
 ```
 Notice how we have a column for iterations.  
 The first iteration uses a sensible value for the hyper-parameters, and then starts "walking" the parameter space in the direction of greatest improvement.  
@@ -364,7 +367,9 @@ cit_grid_result %>%
 
 ```{r}
 # Based on lowest RMSE
-best_rmse <- cit_grid_result 
+best_rmse <- cit_grid_result %>%
+  select_by_one_std_err("tree_depth",
+                        metric = "rmse")
 
 best_rmse
 
@@ -372,7 +377,9 @@ best_rmse
 
 ```{r}
 # Based on greatest R2
-best_r2 <- cit_grid_result 
+best_r2 <- cit_grid_result %>%
+  select_by_one_std_err("tree_depth",
+                        metric = "rsq")
 
 best_r2
 
@@ -486,7 +493,12 @@ final_spec %>%
 Tree:  
 
 ```{r}
-
+final_spec %>%
+  fit(strength_gtex ~ .,
+      data = bake(weather_prep, weather)
+      ) %>%
+  .$fit %>%
+  plot()
   
 ```
 
