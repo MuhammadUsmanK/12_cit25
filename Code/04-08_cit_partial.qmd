@@ -495,7 +495,7 @@ Tree:
 ```{r}
 final_spec %>%
   fit(strength_gtex ~ .,
-      data = bake(weather_prep, weather)
+      data = bake(weather_prep, weather_train)
       ) %>%
   .$fit %>%
   plot()
